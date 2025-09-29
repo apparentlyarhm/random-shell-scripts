@@ -3,6 +3,7 @@ import json
 import platform
 import psutil
 import cpuinfo
+import time
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ see https://stackoverflow.com/questions/69919970/no-module-named-distutils-util-
 
 class SystemInfo(BaseModel):
     """The main model for our system information payload."""
+    timestamp: int = Field(..., description="Time at which this data was captured")
     arch: str = Field(..., description="System architecture (e.g., x86_64, arm64).")
     os_name: str = Field(..., description="The name of the operating system (e.g., Windows, Ubuntu, macOS).")
     os_version: str = Field(..., description="The specific version of the operating system.")
@@ -79,6 +81,7 @@ async def gather_system_info() -> SystemInfo:
         "cpu": cpuinfo.get_cpu_info().get("brand_raw", "Not detected"),
         "memory_gb": round(psutil.virtual_memory().total / (1024**3), 2),
         "gpus": get_gpu_info(),
+        "timestamp": int(time.time())
     }
     
     return SystemInfo(**payload_data)
