@@ -7,6 +7,13 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+
+"""
+see https://stackoverflow.com/questions/69919970/no-module-named-distutils-util-but-distutils-is-installed
+`distutils` was removed with py 3.12, that and we need to install setuptools to make GPUtils work.
+"""
+
+
 class SystemInfo(BaseModel):
     """The main model for our system information payload."""
     arch: str = Field(..., description="System architecture (e.g., x86_64, arm64).")
@@ -33,7 +40,8 @@ def get_os_info() -> tuple[str, str]:
             import distro
             return distro.name(pretty=True), distro.version(pretty=True)
         
-        except ImportError:
+        except ImportError as e:
+            print(f"OS DETECTION :: error => {e}")
             return "Linux", platform.release()
         
     return system, platform.release()
@@ -68,7 +76,7 @@ async def gather_system_info() -> SystemInfo:
         "arch": platform.machine(),
         "os_name": os_name,
         "os_version": os_version,
-        "cpu": cpuinfo.get_cpu_info().get("brand_raw", "N/A"),
+        "cpu": cpuinfo.get_cpu_info().get("brand_raw", "Not detected"),
         "memory_gb": round(psutil.virtual_memory().total / (1024**3), 2),
         "gpus": get_gpu_info(),
     }
