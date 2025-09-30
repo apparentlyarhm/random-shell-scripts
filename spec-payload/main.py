@@ -1,13 +1,20 @@
+from datetime import datetime as dt
+from typing import List
+from pydantic import BaseModel, Field
+
 import asyncio
-import json
 import platform
 import psutil
 import cpuinfo
 import time
-from typing import List, Optional
+import aiohttp
+import dotenv
+import os
 
-from pydantic import BaseModel, Field
+dotenv.load_dotenv(".env")
 
+HOST = os.environ["HOST"]
+API_KEY = os.environ["API_KEY"]
 
 """
 see https://stackoverflow.com/questions/69919970/no-module-named-distutils-util-but-distutils-is-installed
@@ -86,12 +93,49 @@ async def gather_system_info() -> SystemInfo:
     
     return SystemInfo(**payload_data)
 
-async def publish_to_api():
-    pass # placeholder
+async def publish_to_api(data: SystemInfo, host: str, key: str, retries: int, delay: int):
+
+    async with aiohttp.ClientSession() as s:
+        for attempt in range(retries):
+            try:
+                async with s.post(
+                    url=f"{host}/report", 
+                    json=data.model_dump(), 
+                    headers={'X-API-KEY': key},
+                    ) as r:
+                    # there is nothing to process
+                    r.raise_for_status()
+                    print(f"Data sent for {dt.fromtimestamp(data.timestamp).strftime("%A, %d. %B %Y %I:%M%p")}")
+                    break
+
+            except aiohttp.ClientResponseError as e:
+                print("rate limited :: attempting again with backoff")
+
+                if e.status == 429:
+                    if attempt < retries - 1:
+                        await asyncio.sleep(delay * (2 ** attempt))
+                    else: 
+                        print("Unrecoverable rate limtation..")   
+
+                else:
+                    # any other error we will not do anything and (not)silently fail
+                    print("Request failed.")
+                    break
+
+            except (aiohttp.ClientConnectionError, asyncio.TimeoutError) as e:
+                print("host unreachable :: attempting again")
+
+                if attempt < retries - 1:
+                    await asyncio.sleep(delay * 2) 
+
+                else:
+                    print("All retries failed.")
 
 async def main():
     system_info_model = await gather_system_info()
     print(system_info_model.model_dump_json(indent=2))
+
+    await publish_to_api(system_info_model, HOST, API_KEY, 5, 2)
 
 
 if __name__ == "__main__":
