@@ -1,0 +1,15 @@
+[Unit]
+Description=System Report (requires internet)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart={pwd}/.venv/bin/python {pwd}/main.py
+WorkingDirectory={pwd}
+Restart=on-failure
+User=arhum
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
