@@ -73,7 +73,7 @@ This means the **system service** (init_t) attempted to execute a binary labeled
 Place your virtual environment and script under a trusted location like `/opt` or something. tedious. needs script update to change all locations.
 
 
-### Option 1: Register as a User Service
+### Option 2: Register as a User Service
 
 If the service is meant to run only under your user account, create:
 
