@@ -10,6 +10,7 @@ import time
 import aiohttp
 import dotenv
 import os
+import subprocess
 
 dotenv.load_dotenv(".env")
 
@@ -32,11 +33,10 @@ class SystemInfo(BaseModel):
     memory_gb: float = Field(..., description="Total system RAM in GB.")
     gpus: List = Field([], description="A list of GPUs found in the system.")
 
-def get_os_info() -> tuple[str, str]:
+def get_os_info(system: str) -> tuple[str, str]:
     """
     Gets the OS name and version in a platform-independent way.
     """
-    system = platform.system()
     if system == "Windows":
         return "Windows", platform.version() 
     
@@ -55,31 +55,33 @@ def get_os_info() -> tuple[str, str]:
         
     return system, platform.release()
 
-def get_gpu_info() -> List:
+def get_gpu_info(system: str) -> List:
     """
-    Gets GPU information using the GPUtil library.
-    Returns an empty list if no GPUs are found or the library is not installed.
+    Gets GPU information using the OS only. I think without drivers the OS will not report as expected.
     """
     gpus = []
-    try:
-        import GPUtil
-        for gpu in GPUtil.getGPUs():
-            gpus.append(gpu.name)
+    command = ""
 
-    except (ImportError, Exception) as e:
-        print(f"GPU DETECTION :: error => {e}")
+    if system == "Windows":
+        pass
+    
+    elif system == "Linux":
+        pass
+
+    if not gpus:
+        print(":: the platform isnt Linux/Win :: ")
         gpus.append("Not detected")
-
+    
     return gpus
 
-async def gather_system_info() -> SystemInfo:
+async def gather_system_info(system: str) -> SystemInfo: 
     """
     Asynchronously gathers all system information and returns a Pydantic model.
     Note: The gathering functions themselves are blocking, but we wrap them
     in an async function for future compatibility with non-blocking I/O (like the API call).
     """
     print("Gathering system information...")
-    os_name, os_version = get_os_info()
+    os_name, os_version = get_os_info(system)
     
     payload_data = {
         "arch": platform.machine(),
@@ -87,7 +89,7 @@ async def gather_system_info() -> SystemInfo:
         "os_version": os_version,
         "cpu": cpuinfo.get_cpu_info().get("brand_raw", "Not detected"),
         "memory_gb": round(psutil.virtual_memory().total / (1024**3), 2),
-        "gpus": get_gpu_info(),
+        "gpus": get_gpu_info(system),
         "timestamp": int(time.time())
     }
     
@@ -109,15 +111,18 @@ async def publish_to_api(data: SystemInfo, host: str, key: str, retries: int, de
                     break
 
             except aiohttp.ClientResponseError as e:
-                print("rate limited :: attempting again with backoff")
 
                 if e.status == 429:
+                    print("rate limited :: attempting again with backoff")
                     if attempt < retries - 1:
                         await asyncio.sleep(delay * (2 ** attempt))
                     else: 
-                        print("Unrecoverable rate limtation..")   
-
+                        print("Unrecoverable rate limtation..")
+            
                 else:
+                    if e.status == 401:
+                        print("Check api key")
+                       
                     # any other error we will not do anything and (not)silently fail
                     print("Request failed.")
                     break
@@ -132,10 +137,12 @@ async def publish_to_api(data: SystemInfo, host: str, key: str, retries: int, de
                     print("All retries failed.")
 
 async def main():
-    system_info_model = await gather_system_info()
+    system = platform.system()
+
+    system_info_model = await gather_system_info(system)
     print(system_info_model.model_dump_json(indent=2))
 
-    await publish_to_api(system_info_model, HOST, API_KEY, 5, 2)
+    # await publish_to_api(system_info_model, HOST, API_KEY, 5, 2)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,6 @@ dependencies = [
     "aiohttp>=3.12.15",
     "distro>=1.9.0",
     "dotenv>=0.9.9",
-    "gputil>=1.4.0",
     "psutil>=7.1.0",
     "py-cpuinfo>=9.0.0",
     "pydantic>=2.11.9",
