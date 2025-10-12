@@ -63,10 +63,34 @@ def get_gpu_info(system: str) -> List:
     command = ""
 
     if system == "Windows":
-        pass
+        command = "wmic path win32_videocontroller get name"
+        output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
+        lines = output.strip().split('\n')
+        # The first line is "Name", so we skip it.
+        # Subsequent lines are the GPU names, with potential whitespace.
+        for line in lines[1:]:
+            gpu_name = line.strip()
+            if gpu_name:
+                gpus.append(gpu_name)
     
     elif system == "Linux":
-        pass
+        command = "lspci | grep VGA"
+        output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
+        
+        print(len(output.strip().split('\n')))
+        
+        for line in output.strip().split('\n'):
+            if "VGA compatible controller" in line:
+                # The name is typically after the colon, e.g.,
+                # "01:00.0 VGA compatible controller: NVIDIA Corporation GP104 [GeForce GTX 1080]"
+                # or 
+                # "03:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Navi 44 [Radeon RX 9060 XT] (rev c0)"
+                full_name = line.split(":", 2)[-1].strip()
+                if "Advanced Micro Devices, Inc." in full_name:
+                    gpus.append(full_name.replace("Advanced Micro Devices, Inc. [AMD/ATI]", "AMD"))
+
+                else:
+                    gpus.append(full_name)
 
     if not gpus:
         print(":: the platform isnt Linux/Win :: ")
