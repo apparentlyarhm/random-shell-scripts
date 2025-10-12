@@ -11,6 +11,7 @@ import aiohttp
 import dotenv
 import os
 import subprocess
+import math
 
 dotenv.load_dotenv(".env")
 
@@ -77,8 +78,6 @@ def get_gpu_info(system: str) -> List:
         command = "lspci | grep VGA"
         output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
         
-        print(len(output.strip().split('\n')))
-        
         for line in output.strip().split('\n'):
             if "VGA compatible controller" in line:
                 # The name is typically after the colon, e.g.,
@@ -112,7 +111,7 @@ async def gather_system_info(system: str) -> SystemInfo:
         "os_name": os_name,
         "os_version": os_version,
         "cpu": cpuinfo.get_cpu_info().get("brand_raw", "Not detected"),
-        "memory_gb": round(psutil.virtual_memory().total / (1024**3), 2),
+        "memory_gb": math.floor(psutil.virtual_memory().total / (1000**3)),
         "gpus": get_gpu_info(system),
         "timestamp": int(time.time())
     }
