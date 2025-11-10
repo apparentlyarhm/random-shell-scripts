@@ -39,7 +39,7 @@ def get_os_info(system: str) -> tuple[str, str]:
     Gets the OS name and version in a platform-independent way.
     """
     if system == "Windows":
-        return "Windows", platform.version() 
+        return "Windows", platform.release()
     
     # highly doubt ill ever get it
     elif system == "Darwin":
@@ -64,15 +64,16 @@ def get_gpu_info(system: str) -> List:
     command = ""
 
     if system == "Windows":
-        command = "wmic path win32_videocontroller get name"
+        command = [
+            "powershell",
+            "-command",
+            "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"
+        ]
         output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
         lines = output.strip().split('\n')
-        # The first line is "Name", so we skip it.
-        # Subsequent lines are the GPU names, with potential whitespace.
-        for line in lines[1:]:
-            gpu_name = line.strip()
-            if gpu_name:
-                gpus.append(gpu_name)
+
+        for line in lines:
+            gpus.append(line)
     
     elif system == "Linux":
         command = "lspci | grep VGA"
@@ -111,7 +112,7 @@ async def gather_system_info(system: str) -> SystemInfo:
         "os_name": os_name,
         "os_version": os_version,
         "cpu": cpuinfo.get_cpu_info().get("brand_raw", "Not detected"),
-        "memory_gb": math.floor(psutil.virtual_memory().total / (1000**3)),
+        "memory_gb": math.ceil(psutil.virtual_memory().total / (1024**3)),
         "gpus": get_gpu_info(system),
         "timestamp": int(time.time())
     }
@@ -124,7 +125,7 @@ async def publish_to_api(data: SystemInfo, host: str, key: str, retries: int, de
         for attempt in range(retries):
             try:
                 async with s.post(
-                    url=f"{host}/report", 
+                    url=f"{host}/misc/report", 
                     json=data.model_dump(), 
                     headers={'X-API-KEY': key},
                     ) as r:
@@ -147,7 +148,7 @@ async def publish_to_api(data: SystemInfo, host: str, key: str, retries: int, de
                         print("Check api key")
                        
                     # any other error we will not do anything and (not)silently fail
-                    print("Request failed.")
+                    print(f"Request failed.", e)
                     break
 
             except (aiohttp.ClientConnectionError, asyncio.TimeoutError) as e:
