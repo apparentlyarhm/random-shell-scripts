@@ -23,7 +23,7 @@ The difference primarily affects where executables can be placed when registered
 
 ## Issue Summary
 
-When registering a Python-based systemd service on **Fedora**, execution failed with the following error:
+When registering the service on **Fedora**, execution failed with the following error:
 
 ```yaml
 report.service: Unable to locate executable '/home/arhum/.../.venv/bin/python': Permission denied
