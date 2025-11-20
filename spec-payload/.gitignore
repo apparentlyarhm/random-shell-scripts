@@ -1,1 +1,6 @@
 .env
+
+
+# linux files
+*.pp
+*.te
