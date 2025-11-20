@@ -91,3 +91,57 @@ systemctl --user start report.service
 ```
 (notice the `--user` here)
 
+
+### Option 3: Wrappers
+
+If the above doesnt work, we can sort of hack it by creating a wrapper in a trusted place that is out of `/home` (could be `/usr/local/bin`)
+
+so, we could do something like in a `.sh` file in `/usr/local/bin`:
+
+```bash
+#!/bin/bash
+# Wrapper to launch the real Python script inside the project
+exec /home/user/path/to/project/.venv/bin/python /home/user/path/to/project/main.py
+```
+
+and `chmod +x` it.
+
+now, we can modify our `.service` as:
+
+```
+───────┬──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+       │ File: /etc/systemd/system/system-report.service
+───────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1   │ [Unit]
+   2   │ Description=System Report (requires internet)
+   3   │ After=network-online.target
+   4   │ Wants=network-online.target
+   5   │ 
+   6   │ [Service]
+   7   │ Type=simple
+   8   │ ExecStart= ## <-- path to wrapper
+   9   │ User=arhum
+  10   │ WorkingDirectory= ## <-- will probably be needed if .envs are used.
+  11   │ Restart=on-failure
+  12   │ Environment=PYTHONUNBUFFERED=1
+  13   │ 
+  14   │ [Install]
+  15   │ WantedBy=multi-user.target
+
+```
+
+Then, the traditional setup:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start system-report.service
+sudo systemctl enable system-report.service
+```
+
+and read logs:
+
+```bash
+journalctl -u system-report.service -f
+```
+
+This way we get to keep our git setup simple and no sync needed.
