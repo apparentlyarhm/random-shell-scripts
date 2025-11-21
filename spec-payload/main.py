@@ -12,6 +12,7 @@ import dotenv
 import os
 import subprocess
 import math
+import argparse
 
 dotenv.load_dotenv(".env")
 
@@ -119,20 +120,39 @@ async def gather_system_info(system: str) -> SystemInfo:
     
     return SystemInfo(**payload_data)
 
-async def publish_to_api(data: SystemInfo, host: str, key: str, retries: int, delay: int):
+async def publish_to_api(
+        data: SystemInfo | None, 
+        host: str, 
+        key: str, 
+        retries: int, 
+        delay: int, 
+        shutdown: bool
+    ):
 
     async with aiohttp.ClientSession() as s:
         for attempt in range(retries):
             try:
-                async with s.post(
-                    url=f"{host}/misc/report", 
-                    json=data.model_dump(), 
-                    headers={'X-API-KEY': key},
+                if (shutdown):
+                    async with s.delete(
+                        url=f"{host}/misc/report", 
+                        headers={'X-API-KEY': key},
                     ) as r:
-                    # there is nothing to process
-                    r.raise_for_status()
-                    print(f"Data sent for {dt.fromtimestamp(data.timestamp).strftime("%A, %d. %B %Y %I:%M%p")}")
-                    break
+                        r.raise_for_status()
+                        print(f"Deleted report")
+                        break
+                else:
+                    # its just english LMAO
+                    assert data is not None
+
+                    async with s.post(
+                        url=f"{host}/misc/report", 
+                        json=data.model_dump(), 
+                        headers={'X-API-KEY': key},
+                    ) as r:
+                        # there is nothing to process
+                        r.raise_for_status()
+                        print(f"Data sent for {dt.fromtimestamp(data.timestamp).strftime("%A, %d. %B %Y %I:%M%p")}")
+                        break
 
             except aiohttp.ClientResponseError as e:
 
@@ -160,14 +180,21 @@ async def publish_to_api(data: SystemInfo, host: str, key: str, retries: int, de
                 else:
                     print("All retries failed.")
 
-async def main():
-    system = platform.system()
+async def main(shutdownMode: bool):
+    system_info_model = None
+    if not shutdownMode:
+        system = platform.system()
 
-    system_info_model = await gather_system_info(system)
-    print(system_info_model.model_dump_json(indent=2))
+        system_info_model = await gather_system_info(system)
+        print(system_info_model.model_dump_json(indent=2))
 
-    # await publish_to_api(system_info_model, HOST, API_KEY, 5, 2)
+    await publish_to_api(system_info_model, HOST, API_KEY, 5, 2, shutdown=shutdownMode)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="small service that pings my backend with system report. or deletes it in case of shutdown")
+    parser.add_argument("-s", "--s", action='store_true', help="sends delete request instead of generating report")
+
+    args = parser.parse_args()
+
+    asyncio.run(main(shutdownMode=args.s))
