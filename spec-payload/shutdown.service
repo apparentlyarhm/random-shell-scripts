@@ -1,0 +1,17 @@
+[Unit]
+Description=System Report Delete (on shutdown)
+
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStop=/usr/local/bin/rep-sd.sh
+User=root
+WorkingDirectory=/home/arhum/Documents/random-shell-scripts/spec-payload
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+

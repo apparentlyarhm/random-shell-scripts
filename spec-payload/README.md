@@ -145,3 +145,17 @@ journalctl -u system-report.service -f
 ```
 
 This way we get to keep our git setup simple and no sync needed.
+
+## About shutdown scripts
+
+The key to understanding how to get a service to stop at shutdown prior to losing the network is knowing that the shutdown order is the reverse startup order. Therefore, your service should start after `network-online.target` while also having a dependency on `network-online.target`, because it requires the network to be up. Furthermore, there are `ExecStart=` and `ExecStop=` actions that you can define. Since you want the script to run at shutdown, which is when the service stops, you want to define `ExecStop=` pointing to your script.
+
+To set this up, do the following:
+
+- In the `[Unit]` section, create a `Requires=network-online.target` dependency
+- Set the order to After=network-online.target.
+- In the `[Service]` section, don't define an `ExecStart=` action.
+- Set `RemainAfterExit=true`, because we didn't create an `ExecStart=` action.
+- Finally, create an `ExecStop=` action pointing to your script, such as `ExecStop=/home/username/bin/testscript.sh.`
+
+Remember, the shutdown order is the reverse startup order. Therefore, when your service is stopped, your script, which is placed in `ExecStop=`, will be run. And because we started this service after `network-online.target`, it will be shutdown before any services in `network-online.target` are shutdown
